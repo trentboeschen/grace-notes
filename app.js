@@ -48,7 +48,7 @@ const db = new Dexie("NotesApp");
 db.version(1).stores({ notes: 'id, title, content, updated_at, deleted', sync_queue: 'id, action' });
 
 const editor = new MediumEditor('#editor', {
-    placeholder: { text: 'Right-click anywhere for tools. Start writing...', hideOnClick: false },
+    placeholder: { text: 'Ctrl+k for tools.', hideOnClick: false },
     toolbar: { buttons: ['bold', 'italic', 'underline', 'anchor', 'h2', 'h3', 'quote', 'pre'] },
     anchor: { linkValidation: true, placeholderText: 'Paste or type a link', targetCheckbox: true, targetCheckboxText: 'Open in new window' },
     paste: {

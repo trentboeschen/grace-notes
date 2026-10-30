@@ -1,0 +1,326 @@
+
+/* Lock horizontal axis to prevent micro-scrolling */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+*, *::before, *::after {
+    box-sizing: inherit;
+}
+@font-face { font-family: 'Open Sans'; src: url('vendor/fonts/open-sans.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto'; src: url('vendor/fonts/roboto.woff2') format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; src: url('vendor/fonts/opendyslexic.otf') format('opentype'); }
+
+:root {
+    --light-bg: #ffffff; --light-text: #1a1a1a; --dark-bg: #121212; --dark-text: #e0e0e0;
+    --app-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --app-font-size: 16px;
+    --bg-color: var(--light-bg); --text-color: var(--light-text); --ui-color: #e0e0e0; --hover-bg: rgba(0,0,0,0.05); --delete-color: #d9534f;
+    --link-color: #0066cc; --toolbar-bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root { --bg-color: var(--dark-bg); --text-color: var(--dark-text); --ui-color: #333333; --hover-bg: rgba(255,255,255,0.05); --delete-color: #ff6b6b; --link-color: #5ea8ff; --toolbar-bg: #1e1e1e; }
+}
+
+body { 
+    margin: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); 
+    font-family: var(--app-font); font-size: var(--app-font-size); background-color: var(--bg-color); color: var(--text-color); 
+    transition: background-color 0.3s, color 0.3s; min-height: 100vh; 
+}
+.hidden { display: none !important; }
+a { color: var(--link-color); text-decoration: none; border-bottom: 1px dotted var(--link-color); cursor: pointer; }
+
+
+/* Elegant Table Styling */
+table { width: 100%; border-collapse: collapse; margin: 2rem 0; font-size: 0.95em; }
+th, td { padding: 1rem 0.5rem; text-align: left; border-bottom: 1px solid var(--ui-color); vertical-align: top; }
+th { font-weight: 600; opacity: 0.7; letter-spacing: 0.5px; border-bottom: 2px solid var(--ui-color); }
+td { line-height: 1.6; }
+tr:last-child td { border-bottom: none; }
+
+/* Image Styling */
+img { max-width: 100%; height: auto; border-radius: 4px; margin: 1rem 0; display: block; cursor: pointer; transition: outline 0.2s; }
+img.active-img { outline: 2px solid var(--link-color); }
+
+#editor { max-width: 800px; margin: 2rem auto; padding: 1rem; min-height: 80vh; outline: none; color: var(--text-color); }
+#sync-status { position: fixed; bottom: 1rem; right: 1rem; width: 8px; height: 8px; border-radius: 50%; background-color: grey; opacity: 0.5; z-index: 50; transition: background-color 0.3s; }
+#note-list { list-style: none; padding: 0; margin: 0; max-width: 800px; margin: 2rem auto; }
+#note-list li { padding: 1rem; border-bottom: 1px solid var(--ui-color); cursor: pointer; transition: background 0.2s; }
+#note-list li:hover, #note-list li.library-focus { background: var(--hover-bg); }
+
+/* Custom Menus */
+#context-menu, #image-toolbar { position: absolute; background: var(--toolbar-bg); border: 1px solid var(--ui-color); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; z-index: 10000; }
+
+.has-submenu { position: relative; }
+.submenu { display: none; position: absolute; top: -1px; left: 100%; background: var(--toolbar-bg); border: 1px solid var(--ui-color); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; padding: 0.5rem 0; margin: 0; list-style: none; min-width: 190px; z-index: 10001; }
+.has-submenu:hover .submenu { display: block; }
+
+#context-menu { padding: 0.5rem 0; margin: 0; list-style: none; min-width: 160px; }
+#context-menu li { padding: 0.5rem 1.2rem; cursor: pointer; font-size: 14px; user-select: none; }
+#context-menu li:hover { background: var(--hover-bg); }
+#context-menu .separator { height: 1px; background: var(--ui-color); margin: 0.5rem 0; padding: 0; cursor: default; }
+#ctx-delete-note { color: var(--delete-color); }
+
+/* Image Toolbar Specifics */
+#image-toolbar { padding: 0.5rem; display: flex; gap: 0.5rem; align-items: center; }
+#image-toolbar button { background: transparent; color: var(--text-color); border: 1px solid var(--ui-color); border-radius: 4px; cursor: pointer; font-size: 1.2rem; padding: 0.2rem 0.6rem; }
+#image-toolbar button:hover { background: var(--hover-bg); }
+#img-resize-slider { width: 100px; margin-left: 0.5rem; }
+
+#preferences-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 20000; display: flex; align-items: center; justify-content: center; }
+.modal-content { background: var(--bg-color); padding: 2rem; border-radius: 8px; width: 300px; border: 1px solid var(--ui-color); }
+.modal-content h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid var(--ui-color); padding-bottom: 0.5rem; }
+.modal-content h3 { font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-color); opacity: 0.7;}
+.pref-group { margin-bottom: 1.5rem; }
+.pref-group label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 14px; }
+.pref-group select, .pref-group input[type="number"] { background: var(--bg-color); color: var(--text-color); border: 1px solid var(--ui-color); border-radius: 4px; padding: 2px 5px; }
+.pref-group input[type="color"] { border: none; width: 24px; height: 24px; cursor: pointer; padding: 0; background: transparent;}
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+.modal-actions button { background: var(--text-color); color: var(--bg-color); border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 14px; }
+.modal-actions .btn-secondary { background: transparent; color: var(--text-color); border: 1px solid var(--ui-color); }
+
+/* Library List Additions */
+#note-list li { display: flex; justify-content: space-between; align-items: center; }
+.note-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 1rem; flex-grow: 1; }
+.note-date { font-size: 0.8em; opacity: 0.5; white-space: nowrap; flex-shrink: 0; }
+/* Keyboard Navigation Styles */
+#context-menu li.menu-focus { background: var(--hover-bg); }
+.submenu.force-show { display: block !important; }
+
+/* Code Block & Copy Button Styles */
+pre {
+    background-color: var(--hover-bg, #2a2a2a);
+    color: var(--text-color, #f8f8f2);
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+    border: 1px solid var(--ui-color, #444);
+    margin: 1rem 0;
+}
+
+#floating-copy-btn {
+    position: absolute;
+    z-index: 10000;
+    background: rgba(100, 100, 100, 0.8);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+#floating-copy-btn:hover { background: rgba(120, 120, 120, 1); }
+#floating-copy-btn.hidden { display: none; opacity: 0; }
+
+/* Copy Link Library Button */
+#note-list li { position: relative; }
+.btn-copy-link {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    background: var(--ui-color, #444);
+    color: var(--text-color, #fff);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    z-index: 10;
+}
+#note-list li:hover .btn-copy-link,
+#note-list li.library-focus .btn-copy-link {
+    display: block;
+}
+.btn-copy-link:hover { background: var(--hover-bg, #555); }
+
+/* Toast Notification */
+#toast-notification {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--ui-color, #333); color: #fff; padding: 8px 16px;
+    border-radius: 20px; font-size: 0.9rem; z-index: 99999;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+#toast-notification.show { opacity: 1; }
+
+/* Hide note date when Copy Link button is active */
+#note-list li:hover .note-date,
+#note-list li.library-focus .note-date {
+    opacity: 0;
+    visibility: hidden;
+}
+
+/* Style the MediumEditor PRE button as a code icon */
+.medium-editor-action-pre {
+    font-size: 0 !important; /* Hides the default "pre" text */
+    vertical-align: middle;
+}
+.medium-editor-action-pre::before {
+    content: '[<>]';
+    font-size: 14px !important; /* Restores visibility for the icon */
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-weight: bold;
+}
+
+/* --- Sleek, Stable, App-Like Menu Overrides --- */
+#context-menu, .submenu, #image-toolbar {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    font-size: 14px !important;
+    border-radius: 12px !important;
+    padding: 6px !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.1) !important;
+    transform-origin: top left;
+}
+
+#context-menu li, .submenu li {
+    font-family: inherit !important;
+    font-size: 14px !important;
+    border-radius: 8px;
+    padding: 8px 12px !important;
+    margin: 2px 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#context-menu li:hover, #context-menu li.menu-focus, .submenu li:hover {
+    background-color: var(--link-color) !important;
+    color: #ffffff !important;
+}
+
+/* Make delete actions turn red on hover instead of blue */
+#context-menu li#ctx-delete-note:hover, 
+#context-menu li#ctx-del-row:hover, 
+#context-menu li#ctx-del-col:hover, 
+#context-menu li#ctx-del-table:hover {
+    background-color: var(--delete-color) !important;
+    color: #ffffff !important;
+}
+
+#context-menu .separator {
+    height: 1px !important;
+    margin: 6px 4px !important;
+    background-color: var(--ui-color) !important;
+    opacity: 0.5;
+    padding: 0 !important;
+}
+
+/* A fun, bouncy spring animation on open */
+@keyframes menuSpring {
+    0% { opacity: 0; transform: scale(0.9) translateY(-5px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+#context-menu:not(.hidden), .submenu:hover, .submenu.force-show {
+    animation: menuSpring 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* --- iOS & Mobile Optimizations --- */
+body {
+    overscroll-behavior-y: none; /* Kills the iOS rubber-band bounce */
+    -webkit-text-size-adjust: 100%;
+}
+
+button, input, select, a {
+    touch-action: manipulation; /* Kills the 300ms double-tap zoom delay */
+}
+
+#mobile-menu-btn {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background: var(--ui-color);
+    color: var(--text-color);
+    border-radius: 50%;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 44px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 9999;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+    /* Show menu button only on mobile screens */
+    #mobile-menu-btn {
+        display: block;
+    }
+    
+    /* Make hover buttons permanently visible on touch screens */
+    .btn-copy-link {
+        display: block !important;
+        opacity: 0.8;
+    }
+    
+    /* Ensure the context menu fits on small screens */
+    #context-menu {
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+}
+
+/* --- Tagging Styles --- */
+.tag-chip {
+    background: var(--ui-color);
+    color: var(--text-color);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.tag-chip .remove-tag {
+    cursor: pointer;
+    opacity: 0.6;
+    font-weight: bold;
+    font-size: 1.2em;
+    line-height: 1;
+}
+.tag-chip .remove-tag:hover {
+    opacity: 1;
+    color: var(--delete-color);
+}
+#tag-suggestions li {
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    font-size: 0.9em;
+    border-bottom: 1px solid var(--hover-bg);
+}
+#tag-suggestions li:last-child {
+    border-bottom: none;
+}
+#tag-suggestions li:hover {
+    background: var(--hover-bg);
+}
+.library-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.library-tags::-webkit-scrollbar {
+    display: none;
+}
+.library-tags .tag-chip {
+    font-size: 0.75em;
+    padding: 2px 8px;
+    opacity: 0.8;
+}

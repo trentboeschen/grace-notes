@@ -1,6 +1,6 @@
-const CACHE_NAME = 'notes-pwa-v14';
+const CACHE_NAME = 'notes-pwa-v15';
 const APP_SHELL = [
-    './', 'index.php', 'style.css', 'app.js', 'icon.svg',
+    './', 'index.php', 'style.css', 'auth.js', 'app.js', 'icon.svg',
     'vendor/dexie-4.0.8.js', 'vendor/medium-editor.min.js', 'vendor/medium-editor.min.css', 'vendor/medium-editor-theme.min.css', 'vendor/turndown-7.1.2.js', 'vendor/html-docx-0.3.1.js', 'vendor/html2pdf-0.10.1.js',
     'vendor/fonts/open-sans.woff2', 'vendor/fonts/roboto.woff2', 'vendor/fonts/opendyslexic.otf'
 ];

@@ -511,6 +511,7 @@ function handleExport(format) {
 editor.subscribe('editableInput', () => { clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
 
 async function processSyncQueue() {
+    if (!GNAuth.isAuthenticated()) return;
     if (!navigator.onLine) { syncStatus.style.backgroundColor = 'red'; return; } syncStatus.style.backgroundColor = 'goldenrod';
     try {
         const queue = await db.sync_queue.toArray(); const changesToSync = [];
@@ -533,7 +534,7 @@ async function processSyncQueue() {
 setInterval(processSyncQueue, 5000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 async function init() { const lastActive = localStorage.getItem('lastActiveNote'); if (lastActive) await loadNote(lastActive); else showLibrary(); processSyncQueue(); }
-init();
+GNAuth.ready.then(init);
 // Intercept Ctrl+S / Cmd+S to save the note locally instead of opening the browser dialog
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -575,6 +576,7 @@ if (btnRunBackup) {
 }
 // Auto-Backup Timer
 async function checkAutoBackup() {
+    if (!GNAuth.isAuthenticated()) return;
     const lastBackup = parseInt(localStorage.getItem('lastAutoBackup') || '0', 10);
     const now = Date.now();
     if (now - lastBackup > 24 * 60 * 60 * 1000) { // 24 hours

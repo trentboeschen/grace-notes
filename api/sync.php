@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
+gn_require_auth();
 header('Content-Type: application/json');
 try {
     $db = notes_db();

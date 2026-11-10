@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
+gn_require_auth();
 header('Content-Type: application/json');
 $id = isset($_GET['id']) ?$_GET['id'] : '';
 if (empty($id)) { echo json_encode([]); exit; }

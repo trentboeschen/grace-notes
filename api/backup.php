@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
+gn_require_auth();
 error_reporting(0); // Prevent PHP warnings from corrupting the JSON response
 ini_set('display_errors', 0);
 header('Content-Type: application/json');

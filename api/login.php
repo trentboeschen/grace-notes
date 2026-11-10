@@ -10,8 +10,6 @@
  *                                         -> (signed in) change password, sign out others
  */
 require_once __DIR__ . '/auth.php';
-error_reporting(0);
-ini_set('display_errors', '0');
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -119,6 +117,6 @@ try {
         default:
             gn_json(400, ['status' => 'error', 'message' => 'Unknown action.']);
     }
-} catch (Exception $e) {
-    gn_json(500, ['status' => 'error', 'message' => $e->getMessage()]);
+} catch (Throwable $e) {
+    gn_json(500, ['status' => 'error', 'message' => gn_public_error($e)]);
 }

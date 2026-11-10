@@ -1,7 +1,24 @@
 <?php
 /**
- * Shared config and database access. Locations come from config.php.
+ * Shared config, error handling and database access. Locations come from config.php.
  */
+
+// Never print PHP warnings/errors to clients (they leak file paths and corrupt JSON);
+// send them to the server's error log instead. Many shared hosts default display_errors on.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
+/** An error whose message is safe to show to the client (contains no paths or internals). */
+class GnSafeException extends RuntimeException {}
+
+/** Log the full error server-side; return only a client-safe message. */
+function gn_public_error(Throwable $e): string
+{
+    error_log('grace-notes: ' . $e);
+    return $e instanceof GnSafeException
+        ? $e->getMessage()
+        : 'Server error. Details were written to the server error log.';
+}
 
 function gn_config(): array
 {
@@ -16,7 +33,7 @@ function gn_config(): array
 function gn_ensure_dir(string $dir): void
 {
     if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-        throw new RuntimeException('Data directory does not exist and could not be created.');
+        throw new GnSafeException('Data directory does not exist and could not be created.');
     }
 }
 

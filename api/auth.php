@@ -43,11 +43,11 @@ function gn_auth_read(): ?array
     }
     $raw = @file_get_contents($path);
     if ($raw === false || strncmp($raw, GN_FILE_GUARD, strlen(GN_FILE_GUARD)) !== 0) {
-        throw new RuntimeException('Auth file is unreadable or corrupt.');
+        throw new GnSafeException('Auth file is unreadable or corrupt.');
     }
     $state = json_decode(substr($raw, strlen(GN_FILE_GUARD)), true);
     if (!is_array($state) || empty($state['password_hash']) || empty($state['secret'])) {
-        throw new RuntimeException('Auth file is unreadable or corrupt.');
+        throw new GnSafeException('Auth file is unreadable or corrupt.');
     }
     return $state;
 }
@@ -59,12 +59,12 @@ function gn_auth_write(array $state): void
     $tmp = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
     $data = GN_FILE_GUARD . json_encode($state, JSON_UNESCAPED_SLASHES);
     if (@file_put_contents($tmp, $data, LOCK_EX) === false) {
-        throw new RuntimeException('Could not write auth file. Check folder permissions.');
+        throw new GnSafeException('Could not write auth file. Check folder permissions.');
     }
     @chmod($tmp, 0600);
     if (!@rename($tmp, $path)) {
         @unlink($tmp);
-        throw new RuntimeException('Could not write auth file. Check folder permissions.');
+        throw new GnSafeException('Could not write auth file. Check folder permissions.');
     }
 }
 
@@ -75,7 +75,7 @@ function gn_auth_locked(callable $fn)
     gn_ensure_dir(dirname($path));
     $lock = @fopen($path . '.lock', 'c');
     if ($lock === false) {
-        throw new RuntimeException('Could not open auth lock. Check folder permissions.');
+        throw new GnSafeException('Could not open auth lock. Check folder permissions.');
     }
     try {
         flock($lock, LOCK_EX);
@@ -167,8 +167,8 @@ function gn_require_auth(): void
 {
     try {
         $state = gn_auth_read();
-    } catch (Exception $e) {
-        gn_json(500, ['status' => 'error', 'message' => $e->getMessage()]);
+    } catch (Throwable $e) {
+        gn_json(500, ['status' => 'error', 'message' => gn_public_error($e)]);
     }
     if ($state === null) {
         gn_json(401, ['status' => 'error', 'auth' => 'setup', 'message' => 'No password has been set yet.']);

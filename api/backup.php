@@ -1,8 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
 gn_require_auth();
-error_reporting(0); // Prevent PHP warnings from corrupting the JSON response
-ini_set('display_errors', 0);
 header('Content-Type: application/json');
 
 try {
@@ -39,7 +37,8 @@ try {
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Permission denied. Could not copy file to destination.']);
     }
-} catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => gn_public_error($e)]);
 }
 ?>

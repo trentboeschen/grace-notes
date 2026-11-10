@@ -181,6 +181,7 @@
     </div>
 
     <script src="vendor/dexie-4.0.8.js"></script>
+    <script src="vendor/dompurify-3.4.17.min.js"></script>
     <script src="vendor/medium-editor.min.js"></script>
     <script src="vendor/turndown-7.1.2.js"></script>
     <script src="vendor/html-docx-0.3.1.js"></script>

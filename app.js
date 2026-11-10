@@ -55,6 +55,46 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     }
 });
 function sanitizeHTML(html) { return DOMPurify.sanitize(typeof html === 'string' ? html : '', PURIFY_CONFIG); }
+// --- Plain text & titles ---
+// Enter creates a new block (<p>, <div>, ...), not a "\n", so textContent runs lines
+// together ("Title" + "Next line" -> "TitleNext line"). Walk the DOM instead, breaking
+// lines at block elements and <br>. DOMParser keeps parsing inert (no image loads).
+const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE', 'TABLE', 'TR', 'TD', 'TH', 'HR', 'FIGURE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER']);
+function htmlToPlainText(html) {
+    const body = new DOMParser().parseFromString(html || '', 'text/html').body;
+    let out = '';
+    const endLine = () => { if (out && !out.endsWith('\n')) out += '\n'; }; // start a new line unless already on one
+    const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) { out += node.nodeValue.replace(/\s+/g, ' '); return; }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        if (node.tagName === 'BR') {
+            // A lone <br> inside an otherwise empty block is how editors mark a blank line.
+            const onlyChild = node.parentNode.childNodes.length === 1 && BLOCK_TAGS.has(node.parentNode.tagName);
+            if (!onlyChild || out.endsWith('\n')) out += '\n';
+            return;
+        }
+        const block = BLOCK_TAGS.has(node.tagName);
+        if (block) endLine();
+        node.childNodes.forEach(walk);
+        if (block) endLine();
+    };
+    walk(body);
+    return out.split('\n').map(line => line.trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function noteTitleFromHTML(html) {
+    const firstLine = htmlToPlainText(html).split('\n').find(line => line) || '';
+    return firstLine.substring(0, 40) || 'Untitled Note';
+}
+// Titles for display, derived from content so notes saved with an old run-together
+// title show correctly. Cached per note version to keep library filtering fast.
+const titleCache = new Map();
+function displayTitle(note) {
+    const hit = titleCache.get(note.id);
+    if (hit && hit.updated_at === note.updated_at) return hit.title;
+    const title = noteTitleFromHTML(note.content);
+    titleCache.set(note.id, { updated_at: note.updated_at, title });
+    return title;
+}
 function escapeHTML(text) { return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 const db = new Dexie("SpareNotes");
@@ -417,7 +457,7 @@ document.getElementById('btn-save-prefs').addEventListener('click', () => {
 function showEditor(id) { currentNoteId = id; localStorage.setItem('lastActiveNote', id); libraryView.classList.add('hidden'); editorView.classList.remove('hidden'); setTimeout(() => document.getElementById('editor').focus(), 50); }
 function showLibrary() { document.title = 'Spare Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
 async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); editor.setContent(''); showEditor(newId); }
-async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
+async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = displayTitle(note) + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
 
 async function saveLocal() {
     if (!currentNoteId) return; syncStatus.style.backgroundColor = 'goldenrod';
@@ -425,7 +465,7 @@ async function saveLocal() {
     cloneDiv.innerHTML = sanitizeHTML(editor.getContent());
     cloneDiv.querySelectorAll('img').forEach(img => img.classList.remove('active-img'));
     const content = cloneDiv.innerHTML;
-    const title = (cloneDiv.textContent || cloneDiv.innerText || "").split('\n')[0].substring(0, 40) || "Untitled Note";
+    const title = noteTitleFromHTML(content);
     document.title = title + ' - Spare Notes';
     await db.notes.put({ id: currentNoteId, title: title, content: content, updated_at: Date.now(), deleted: 0 }); await db.sync_queue.put({ id: currentNoteId, action: 'upsert' });
     setTimeout(() => { syncStatus.style.backgroundColor = 'green'; }, 300);
@@ -433,12 +473,13 @@ async function saveLocal() {
 
 let librarySearchQuery = '';
 async function renderLibrary(query = '') {
-    noteList.innerHTML = ''; 
     let notes = await db.notes.where('deleted').equals(0).reverse().sortBy('updated_at');
+    // Clear only after the await: overlapping renders (fast typing) would otherwise each append a full list.
+    noteList.innerHTML = '';
     
     if (query) {
         const q = query.toLowerCase();
-        notes = notes.filter(n => (n.title && n.title.toLowerCase().includes(q)) || (n.content && n.content.toLowerCase().includes(q)) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q))));
+        notes = notes.filter(n => displayTitle(n).toLowerCase().includes(q) || (n.content && n.content.toLowerCase().includes(q)) || (n.tags && n.tags.some(t => t.toLowerCase().includes(q))));
     }
     
     notes.forEach(note => {
@@ -448,7 +489,7 @@ async function renderLibrary(query = '') {
         
         const titleSpan = document.createElement('span');
         titleSpan.className = 'note-title';
-        titleSpan.textContent = note.title;
+        titleSpan.textContent = displayTitle(note);
         
         const dateSpan = document.createElement('span');
         dateSpan.className = 'note-date';
@@ -475,8 +516,8 @@ async function renderLibrary(query = '') {
     });
 }
 function handleExport(format) {
-    if (!format) return; const contentHTML = sanitizeHTML(editor.getContent()); const tempDiv = document.createElement('div'); tempDiv.innerHTML = contentHTML; const plainText = tempDiv.innerText || tempDiv.textContent || "";
-    let title = (plainText.split('\n')[0].substring(0, 40) || "Note").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    if (!format) return; const contentHTML = sanitizeHTML(editor.getContent()); const plainText = htmlToPlainText(contentHTML);
+    let title = (noteTitleFromHTML(contentHTML) || "Note").replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const triggerDownload = (blob, ext) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${title}.${ext}`; a.click(); URL.revokeObjectURL(url); };
     if (format === 'txt') { triggerDownload(new Blob([plainText], { type: 'text/plain' }), 'txt'); } else if (format === 'md') { const turndownService = new TurndownService(); triggerDownload(new Blob([turndownService.turndown(contentHTML)], { type: 'text/markdown' }), 'md'); } else if (format === 'docx') { 
         const docxContent = `<!DOCTYPE html>

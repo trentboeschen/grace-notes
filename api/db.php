@@ -14,7 +14,7 @@ class GnSafeException extends RuntimeException {}
 /** Log the full error server-side; return only a client-safe message. */
 function gn_public_error(Throwable $e): string
 {
-    error_log('grace-notes: ' . $e);
+    error_log('spare-notes: ' . $e);
     return $e instanceof GnSafeException
         ? $e->getMessage()
         : 'Server error. Details were written to the server error log.';

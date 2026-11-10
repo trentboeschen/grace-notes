@@ -3,5 +3,5 @@
 return [
     // Absolute path to the SQLite database file. Put it outside the web root.
     // The directory is created automatically (mode 0700) if it does not exist.
-    'db_path' => '/home/youruser/private/grace-notes/database.sqlite',
+    'db_path' => '/home/youruser/private/spare-notes/database.sqlite',
 ];

@@ -1,4 +1,4 @@
-# Grace Notes
+# Spare Notes
 
 A minimal, single-user notes app you host yourself. It runs on cheap shared/managed
 PHP hosting with no database server, no build step and no dependencies to install:
@@ -37,7 +37,7 @@ SQLite file on your server, so every device you sign in on sees the same notes.
    ```php
    <?php
    return [
-       'db_path' => '/home/youruser/private/grace-notes/database.sqlite',
+       'db_path' => '/home/youruser/private/spare-notes/database.sqlite',
    ];
    ```
 
@@ -55,10 +55,10 @@ the environment variable wins.
 
 | Setting     | Environment variable  | Default                      | Purpose                                         |
 |-------------|-----------------------|------------------------------|-------------------------------------------------|
-| `db_path`   | `GRACE_NOTES_DB_PATH` | `api/database.sqlite`        | Location of the SQLite database                 |
+| `db_path`   | `SPARE_NOTES_DB_PATH` | `api/database.sqlite`        | Location of the SQLite database                 |
 | `auth_path` | none                  | `auth.data.php` next to the DB | Location of the password hash and signing key |
 
-On Apache you can set the environment variable with `SetEnv GRACE_NOTES_DB_PATH /path/to/database.sqlite`.
+On Apache you can set the environment variable with `SetEnv SPARE_NOTES_DB_PATH /path/to/database.sqlite`.
 
 ### Files created at runtime
 

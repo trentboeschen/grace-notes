@@ -415,9 +415,9 @@ document.getElementById('btn-save-prefs').addEventListener('click', () => {
 });
 
 function showEditor(id) { currentNoteId = id; localStorage.setItem('lastActiveNote', id); libraryView.classList.add('hidden'); editorView.classList.remove('hidden'); setTimeout(() => document.getElementById('editor').focus(), 50); }
-function showLibrary() { document.title = 'Grace Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
+function showLibrary() { document.title = 'Spare Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
 async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); editor.setContent(''); showEditor(newId); }
-async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Grace Notes'; showEditor(id); } else showLibrary(); }
+async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
 
 async function saveLocal() {
     if (!currentNoteId) return; syncStatus.style.backgroundColor = 'goldenrod';
@@ -426,7 +426,7 @@ async function saveLocal() {
     cloneDiv.querySelectorAll('img').forEach(img => img.classList.remove('active-img'));
     const content = cloneDiv.innerHTML;
     const title = (cloneDiv.textContent || cloneDiv.innerText || "").split('\n')[0].substring(0, 40) || "Untitled Note";
-    document.title = title + ' - Grace Notes';
+    document.title = title + ' - Spare Notes';
     await db.notes.put({ id: currentNoteId, title: title, content: content, updated_at: Date.now(), deleted: 0 }); await db.sync_queue.put({ id: currentNoteId, action: 'upsert' });
     setTimeout(() => { syncStatus.style.backgroundColor = 'green'; }, 300);
 }

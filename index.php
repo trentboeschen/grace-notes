@@ -6,9 +6,9 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="color-scheme" content="light dark">
-    <title>Grace Notes</title>
-    <meta name="application-name" content="Grace Notes">
-    <meta name="apple-mobile-web-app-title" content="Grace Notes">
+    <title>Spare Notes</title>
+    <meta name="application-name" content="Spare Notes">
+    <meta name="apple-mobile-web-app-title" content="Spare Notes">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="manifest" href="manifest.json">

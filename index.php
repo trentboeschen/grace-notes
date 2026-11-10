@@ -150,6 +150,16 @@
                 </label>
                 <button id="btn-run-backup" class="btn-secondary" style="margin-top: 0.75rem; width: 100%;">Run Server Backup Now</button>
             </div>
+            <div class="pref-group">
+                <h3>Account</h3>
+                <input type="text" class="visually-hidden" autocomplete="username" value="notes" tabindex="-1" aria-hidden="true">
+                <input type="password" id="acct-current" class="pref-text" placeholder="Current password" autocomplete="current-password">
+                <input type="password" id="acct-new" class="pref-text" placeholder="New password (8+ characters)" autocomplete="new-password">
+                <button id="btn-change-password" class="pref-wide">Change Password</button>
+                <button id="btn-signout-others" class="pref-wide">Sign Out All Other Devices</button>
+                <button id="btn-signout" class="pref-wide">Sign Out of This Device</button>
+                <div id="acct-msg" class="auth-msg" role="status"></div>
+            </div>
             <div class="modal-actions">
                 <button id="btn-save-prefs">Save</button>
                 <button id="btn-close-prefs" class="btn-secondary">Cancel</button>
@@ -157,11 +167,26 @@
         </div>
     </div>
 
+    <!-- Sign-in / first-visit setup -->
+    <div id="auth-overlay" class="hidden">
+        <form id="auth-form" class="modal-content auth-card">
+            <h2 id="auth-title">Sign in</h2>
+            <p id="auth-help" class="auth-help"></p>
+            <input type="text" class="visually-hidden" autocomplete="username" value="notes" tabindex="-1" aria-hidden="true">
+            <input type="password" id="auth-password" class="pref-text" placeholder="Password" autocomplete="current-password">
+            <input type="password" id="auth-confirm" class="pref-text hidden" placeholder="Confirm password" autocomplete="new-password">
+            <div id="auth-msg" class="auth-msg" role="alert"></div>
+            <div class="modal-actions"><button type="submit" id="auth-submit">Sign In</button></div>
+        </form>
+    </div>
+
     <script src="vendor/dexie-4.0.8.js"></script>
+    <script src="vendor/dompurify-3.4.17.min.js"></script>
     <script src="vendor/medium-editor.min.js"></script>
     <script src="vendor/turndown-7.1.2.js"></script>
     <script src="vendor/html-docx-0.3.1.js"></script>
     <script src="vendor/html2pdf-0.10.1.js"></script>
+    <script src="auth.js" defer></script>
     <script src="app.js" defer></script>
     <div id="toast-notification">Copied to clipboard!</div>
     <div id="mobile-menu-btn">⋯</div>

@@ -44,6 +44,19 @@ function loadPreferences() {
 }
 loadPreferences(); 
 
+// --- HTML sanitizing (DOMPurify) ---
+// Note HTML from local storage, the server, or revision history passes through
+// sanitizeHTML() before it reaches the DOM, so stored markup can't run script.
+const PURIFY_CONFIG = { ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'form', 'input', 'button', 'textarea', 'select'] };
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A' && node.hasAttribute('target')) {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+    }
+});
+function sanitizeHTML(html) { return DOMPurify.sanitize(typeof html === 'string' ? html : '', PURIFY_CONFIG); }
+function escapeHTML(text) { return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
 const db = new Dexie("NotesApp");
 db.version(1).stores({ notes: 'id, title, content, updated_at, deleted', sync_queue: 'id, action' });
 
@@ -404,12 +417,12 @@ document.getElementById('btn-save-prefs').addEventListener('click', () => {
 function showEditor(id) { currentNoteId = id; localStorage.setItem('lastActiveNote', id); libraryView.classList.add('hidden'); editorView.classList.remove('hidden'); setTimeout(() => document.getElementById('editor').focus(), 50); }
 function showLibrary() { document.title = 'Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
 async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); editor.setContent(''); showEditor(newId); }
-async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(note.content); document.title = (note.title || 'Untitled Note') + ' - Notes'; showEditor(id); } else showLibrary(); }
+async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Notes'; showEditor(id); } else showLibrary(); }
 
 async function saveLocal() {
     if (!currentNoteId) return; syncStatus.style.backgroundColor = 'goldenrod';
     const cloneDiv = document.createElement('div');
-    cloneDiv.innerHTML = editor.getContent();
+    cloneDiv.innerHTML = sanitizeHTML(editor.getContent());
     cloneDiv.querySelectorAll('img').forEach(img => img.classList.remove('active-img'));
     const content = cloneDiv.innerHTML;
     const title = (cloneDiv.textContent || cloneDiv.innerText || "").split('\n')[0].substring(0, 40) || "Untitled Note";
@@ -448,7 +461,7 @@ async function renderLibrary(query = '') {
         infoDiv.appendChild(titleSpan);
         if (note.tags && note.tags.length > 0) {
             const tagsDiv = document.createElement('div'); tagsDiv.className = 'library-tags';
-            tagsDiv.innerHTML = note.tags.map(t => `<span class="tag-chip">#${t}</span>`).join('');
+            tagsDiv.innerHTML = note.tags.map(t => `<span class="tag-chip">#${escapeHTML(t)}</span>`).join('');
             infoDiv.appendChild(tagsDiv);
         }
         li.appendChild(infoDiv);
@@ -462,7 +475,7 @@ async function renderLibrary(query = '') {
     });
 }
 function handleExport(format) {
-    if (!format) return; const contentHTML = editor.getContent(); const tempDiv = document.createElement('div'); tempDiv.innerHTML = contentHTML; const plainText = tempDiv.innerText || tempDiv.textContent || "";
+    if (!format) return; const contentHTML = sanitizeHTML(editor.getContent()); const tempDiv = document.createElement('div'); tempDiv.innerHTML = contentHTML; const plainText = tempDiv.innerText || tempDiv.textContent || "";
     let title = (plainText.split('\n')[0].substring(0, 40) || "Note").replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const triggerDownload = (blob, ext) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${title}.${ext}`; a.click(); URL.revokeObjectURL(url); };
     if (format === 'txt') { triggerDownload(new Blob([plainText], { type: 'text/plain' }), 'txt'); } else if (format === 'md') { const turndownService = new TurndownService(); triggerDownload(new Blob([turndownService.turndown(contentHTML)], { type: 'text/markdown' }), 'md'); } else if (format === 'docx') { 
@@ -511,6 +524,7 @@ function handleExport(format) {
 editor.subscribe('editableInput', () => { clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
 
 async function processSyncQueue() {
+    if (!GNAuth.isAuthenticated()) return;
     if (!navigator.onLine) { syncStatus.style.backgroundColor = 'red'; return; } syncStatus.style.backgroundColor = 'goldenrod';
     try {
         const queue = await db.sync_queue.toArray(); const changesToSync = [];
@@ -522,7 +536,7 @@ async function processSyncQueue() {
             if (result.server_notes && result.server_notes.length > 0) {
                 for (const remoteNote of result.server_notes) {
                     const localNote = await db.notes.get(remoteNote.id);
-                    if (!localNote || remoteNote.updated_at > localNote.updated_at) { await db.notes.put(remoteNote); if (currentNoteId === remoteNote.id) { if (remoteNote.deleted == 1) showLibrary(); else editor.setContent(remoteNote.content); } }
+                    if (!localNote || remoteNote.updated_at > localNote.updated_at) { remoteNote.content = sanitizeHTML(remoteNote.content); await db.notes.put(remoteNote); if (currentNoteId === remoteNote.id) { if (remoteNote.deleted == 1) showLibrary(); else editor.setContent(remoteNote.content); } }
                 }
                 if (libraryView.classList.contains('hidden') === false) renderLibrary();
             }
@@ -532,8 +546,8 @@ async function processSyncQueue() {
 }
 setInterval(processSyncQueue, 5000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-async function init() { const lastActive = localStorage.getItem('lastActiveNote'); if (lastActive) await loadNote(lastActive); else showLibrary(); processSyncQueue(); }
-init();
+async function init() { const linked = new URLSearchParams(window.location.search).get('n'); const target = linked || localStorage.getItem('lastActiveNote'); if (target) await loadNote(target); else showLibrary(); processSyncQueue(); }
+GNAuth.ready.then(init);
 // Intercept Ctrl+S / Cmd+S to save the note locally instead of opening the browser dialog
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -575,6 +589,7 @@ if (btnRunBackup) {
 }
 // Auto-Backup Timer
 async function checkAutoBackup() {
+    if (!GNAuth.isAuthenticated()) return;
     const lastBackup = parseInt(localStorage.getItem('lastAutoBackup') || '0', 10);
     const now = Date.now();
     if (now - lastBackup > 24 * 60 * 60 * 1000) { // 24 hours
@@ -622,7 +637,7 @@ if (ctxRevisions) {
                     opt.textContent = d.toLocaleString();
                     revSelect.appendChild(opt);
                 });
-                revPreview.innerHTML = currentRevisions[0].content;
+                revPreview.innerHTML = sanitizeHTML(currentRevisions[0].content);
             }
         } catch (e) {
             revSelect.innerHTML = '<option>Error loading revisions.</option>';
@@ -632,7 +647,7 @@ if (ctxRevisions) {
 
 revSelect.addEventListener('change', (e) => {
     if (currentRevisions[e.target.value]) {
-        revPreview.innerHTML = currentRevisions[e.target.value].content;
+        revPreview.innerHTML = sanitizeHTML(currentRevisions[e.target.value].content);
     }
 });
 
@@ -643,7 +658,7 @@ document.getElementById('btn-close-revs').addEventListener('click', () => {
 document.getElementById('btn-restore-rev').addEventListener('click', () => {
     const selectedIdx = revSelect.value;
     if (currentRevisions[selectedIdx]) {
-        editor.setContent(currentRevisions[selectedIdx].content);
+        editor.setContent(sanitizeHTML(currentRevisions[selectedIdx].content));
         saveLocal();
         revModal.classList.add('hidden'); revModal.style.display = 'none';
     }
@@ -966,7 +981,7 @@ if (tagInput) {
         }
         const matches = allExistingTags.filter(t => t.toLowerCase().includes(val) && !currentNoteTags.includes(t));
         if (matches.length > 0) {
-            tagSuggestions.innerHTML = matches.map(m => `<li>${m}</li>`).join('');
+            tagSuggestions.innerHTML = matches.map(m => `<li>${escapeHTML(m)}</li>`).join('');
             tagSuggestions.classList.remove('hidden');
         } else {
             tagSuggestions.classList.add('hidden');
@@ -1001,7 +1016,7 @@ function addTag(tag) {
 function renderTagChips() {
     const container = document.getElementById('current-tags');
     if (!container) return;
-    container.innerHTML = currentNoteTags.map(t => `<span class="tag-chip">${t} <span class="remove-tag" data-tag="${t.replace(/"/g, '&quot;')}">×</span></span>`).join('');
+    container.innerHTML = currentNoteTags.map(t => `<span class="tag-chip">${escapeHTML(t)} <span class="remove-tag" data-tag="${escapeHTML(t)}">×</span></span>`).join('');
 }
 
 document.addEventListener('click', (e) => {

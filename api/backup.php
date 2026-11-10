@@ -1,6 +1,6 @@
 <?php
-error_reporting(0); // Prevent PHP warnings from corrupting the JSON response
-ini_set('display_errors', 0);
+require_once __DIR__ . '/auth.php';
+gn_require_auth();
 header('Content-Type: application/json');
 
 try {
@@ -14,7 +14,7 @@ try {
     if (!is_dir($path)) { @mkdir($path, 0755, true); }
     if (!is_dir($path) || !is_writable($path)) { echo json_encode(['status' => 'error', 'message' => 'Path is not writable. Check folder permissions (e.g., chmod 775 or 777).']); exit; }
 
-    $source = __DIR__ . '/database.sqlite';
+    $source = notes_db_path();
     if (!file_exists($source)) { echo json_encode(['status' => 'error', 'message' => 'No database found.']); exit; }
 
     $filename = 'notes_backup_' . date('Ymd_His') . '.sqlite';
@@ -37,7 +37,8 @@ try {
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Permission denied. Could not copy file to destination.']);
     }
-} catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => gn_public_error($e)]);
 }
 ?>

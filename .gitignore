@@ -1,0 +1,9 @@
+# Runtime data and local server config: never commit.
+api/*.sqlite
+api/*.sqlite3
+api/*.db
+api/settings.json
+api/config.local.php
+api/auth.data.php
+api/*.lock
+api/*.tmp

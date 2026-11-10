@@ -1,9 +1,9 @@
 <?php
+require_once __DIR__ . '/auth.php';
+gn_require_auth();
 header('Content-Type: application/json');
 try {
-    $db = new PDO('sqlite:' . __DIR__ . '/database.sqlite');
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);$db->exec("CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT, content TEXT, updated_at INTEGER, deleted INTEGER DEFAULT 0)"); 
-    $db->exec("CREATE TABLE IF NOT EXISTS revisions (id TEXT PRIMARY KEY, note_id TEXT, content TEXT, created_at INTEGER)");
+    $db = notes_db();
     $input = file_get_contents('php://input'); $data = json_decode($input, true);
     $server_timestamp = round(microtime(true) * 1000);$client_last_sync = isset($data['last_sync']) ? (int)$data['last_sync'] : 0;
     $db->beginTransaction();
@@ -36,8 +36,8 @@ try {
     $server_notes =$stmtPull->fetchAll(PDO::FETCH_ASSOC);
     foreach($server_notes as &$n) { $n['updated_at'] = (int)$n['updated_at']; $n['deleted'] = (int)$n['deleted']; }
     echo json_encode(["status" => "success", "server_timestamp" => $server_timestamp, "server_notes" => $server_notes]);
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if (isset($db) && $db->inTransaction())$db->rollBack();
-    http_response_code(500); echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    http_response_code(500); echo json_encode(["status" => "error", "message" => gn_public_error($e)]);
 }
 ?>

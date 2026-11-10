@@ -57,7 +57,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 function sanitizeHTML(html) { return DOMPurify.sanitize(typeof html === 'string' ? html : '', PURIFY_CONFIG); }
 function escapeHTML(text) { return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-const db = new Dexie("NotesApp");
+const db = new Dexie("SpareNotes");
 db.version(1).stores({ notes: 'id, title, content, updated_at, deleted', sync_queue: 'id, action' });
 
 const editor = new MediumEditor('#editor', {
@@ -524,7 +524,7 @@ function handleExport(format) {
 editor.subscribe('editableInput', () => { clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
 
 async function processSyncQueue() {
-    if (!GNAuth.isAuthenticated()) return;
+    if (!SNAuth.isAuthenticated()) return;
     if (!navigator.onLine) { syncStatus.style.backgroundColor = 'red'; return; } syncStatus.style.backgroundColor = 'goldenrod';
     try {
         const queue = await db.sync_queue.toArray(); const changesToSync = [];
@@ -547,7 +547,7 @@ async function processSyncQueue() {
 setInterval(processSyncQueue, 5000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 async function init() { const linked = new URLSearchParams(window.location.search).get('n'); const target = linked || localStorage.getItem('lastActiveNote'); if (target) await loadNote(target); else showLibrary(); processSyncQueue(); }
-GNAuth.ready.then(init);
+SNAuth.ready.then(init);
 // Intercept Ctrl+S / Cmd+S to save the note locally instead of opening the browser dialog
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -589,7 +589,7 @@ if (btnRunBackup) {
 }
 // Auto-Backup Timer
 async function checkAutoBackup() {
-    if (!GNAuth.isAuthenticated()) return;
+    if (!SNAuth.isAuthenticated()) return;
     const lastBackup = parseInt(localStorage.getItem('lastAutoBackup') || '0', 10);
     const now = Date.now();
     if (now - lastBackup > 24 * 60 * 60 * 1000) { // 24 hours

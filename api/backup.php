@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-gn_require_auth();
+sn_require_auth();
 header('Content-Type: application/json');
 
 try {
@@ -39,6 +39,6 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => gn_public_error($e)]);
+    echo json_encode(['status' => 'error', 'message' => sn_public_error($e)]);
 }
 ?>

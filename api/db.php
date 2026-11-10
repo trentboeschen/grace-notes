@@ -9,18 +9,18 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
 /** An error whose message is safe to show to the client (contains no paths or internals). */
-class GnSafeException extends RuntimeException {}
+class SnSafeException extends RuntimeException {}
 
 /** Log the full error server-side; return only a client-safe message. */
-function gn_public_error(Throwable $e): string
+function sn_public_error(Throwable $e): string
 {
     error_log('spare-notes: ' . $e);
-    return $e instanceof GnSafeException
+    return $e instanceof SnSafeException
         ? $e->getMessage()
         : 'Server error. Details were written to the server error log.';
 }
 
-function gn_config(): array
+function sn_config(): array
 {
     static $config = null;
     if ($config === null) {
@@ -30,22 +30,22 @@ function gn_config(): array
 }
 
 /** Create a private directory if needed. Deliberately generic errors: don't leak server paths. */
-function gn_ensure_dir(string $dir): void
+function sn_ensure_dir(string $dir): void
 {
     if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
-        throw new GnSafeException('Data directory does not exist and could not be created.');
+        throw new SnSafeException('Data directory does not exist and could not be created.');
     }
 }
 
 function notes_db_path(): string
 {
-    return (string) gn_config()['db_path'];
+    return (string) sn_config()['db_path'];
 }
 
 function notes_db(): PDO
 {
     $path = notes_db_path();
-    gn_ensure_dir(dirname($path));
+    sn_ensure_dir(dirname($path));
 
     $db = new PDO('sqlite:' . $path);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);

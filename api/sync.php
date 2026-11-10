@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-gn_require_auth();
+sn_require_auth();
 header('Content-Type: application/json');
 try {
     $db = notes_db();
@@ -38,6 +38,6 @@ try {
     echo json_encode(["status" => "success", "server_timestamp" => $server_timestamp, "server_notes" => $server_notes]);
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction())$db->rollBack();
-    http_response_code(500); echo json_encode(["status" => "error", "message" => gn_public_error($e)]);
+    http_response_code(500); echo json_encode(["status" => "error", "message" => sn_public_error($e)]);
 }
 ?>

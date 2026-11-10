@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notes-pwa-v16';
+const CACHE_NAME = 'spare-notes-v1';
 const APP_SHELL = [
     './', 'index.php', 'style.css', 'auth.js', 'app.js', 'icon.svg',
     'vendor/dexie-4.0.8.js', 'vendor/dompurify-3.4.17.min.js', 'vendor/medium-editor.min.js', 'vendor/medium-editor.min.css', 'vendor/medium-editor-theme.min.css', 'vendor/turndown-7.1.2.js', 'vendor/html-docx-0.3.1.js', 'vendor/html2pdf-0.10.1.js',

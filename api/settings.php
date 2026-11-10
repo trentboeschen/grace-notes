@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
-gn_require_auth();
+sn_require_auth();
 header('Content-Type: application/json');
 $file = __DIR__ . '/settings.json';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

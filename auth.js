@@ -1,8 +1,8 @@
 // --- Authentication gate & account controls ---
-// Loaded before app.js. Exposes window.GNAuth = { ready, isAuthenticated, handleUnauthorized }.
+// Loaded before app.js. Exposes window.SNAuth = { ready, isAuthenticated, handleUnauthorized }.
 (function () {
     const API = 'api/login.php';
-    const FLAG = 'gnAuthed'; // Remembers sign-in so the app opens offline. Not a credential.
+    const FLAG = 'snAuthed'; // Remembers sign-in so the app opens offline. Not a credential.
 
     const $ = (id) => document.getElementById(id);
     const overlay = $('auth-overlay'), form = $('auth-form'), title = $('auth-title'), help = $('auth-help');
@@ -154,11 +154,11 @@
         } catch (err) { say('Connect to the internet to sign out.'); return; }
         setFlag(false);
         ['lastSyncTime', 'lastActiveNote', 'lastAutoBackup'].forEach((k) => { try { localStorage.removeItem(k); } catch (err) {} });
-        try { db.close(); await Dexie.delete('NotesApp'); } catch (err) {}
+        try { db.close(); await Dexie.delete('SpareNotes'); } catch (err) {}
         location.href = location.pathname;
     });
 
     const ready = waitForAuth();
     check();
-    window.GNAuth = { ready, isAuthenticated: () => authed, handleUnauthorized };
+    window.SNAuth = { ready, isAuthenticated: () => authed, handleUnauthorized };
 })();

@@ -17,65 +17,65 @@
 
 require_once __DIR__ . '/db.php';
 
-const GN_COOKIE = 'gn_auth';
-const GN_COOKIE_TTL = 400 * 86400;     // Chrome caps cookie lifetime at 400 days.
-const GN_RENEW_AFTER = 86400;          // Re-issue (slide expiry) at most daily.
-const GN_MIN_PASSWORD = 8;
-const GN_MAX_PASSWORD = 1024;
-const GN_FREE_ATTEMPTS = 5;            // Failed attempts before lockout starts.
-const GN_MAX_LOCKOUT = 900;            // Lockout ceiling in seconds.
-const GN_FILE_GUARD = "<?php http_response_code(404); exit; ?>\n";
+const SN_COOKIE = 'sn_auth';
+const SN_COOKIE_TTL = 400 * 86400;     // Chrome caps cookie lifetime at 400 days.
+const SN_RENEW_AFTER = 86400;          // Re-issue (slide expiry) at most daily.
+const SN_MIN_PASSWORD = 8;
+const SN_MAX_PASSWORD = 1024;
+const SN_FREE_ATTEMPTS = 5;            // Failed attempts before lockout starts.
+const SN_MAX_LOCKOUT = 900;            // Lockout ceiling in seconds.
+const SN_FILE_GUARD = "<?php http_response_code(404); exit; ?>\n";
 
-function gn_auth_path(): string
+function sn_auth_path(): string
 {
-    $config = gn_config();
+    $config = sn_config();
     if (!empty($config['auth_path'])) {
         return (string) $config['auth_path'];
     }
     return dirname(notes_db_path()) . '/auth.data.php';
 }
 
-function gn_auth_read(): ?array
+function sn_auth_read(): ?array
 {
-    $path = gn_auth_path();
+    $path = sn_auth_path();
     if (!is_file($path)) {
         return null;
     }
     $raw = @file_get_contents($path);
-    if ($raw === false || strncmp($raw, GN_FILE_GUARD, strlen(GN_FILE_GUARD)) !== 0) {
-        throw new GnSafeException('Auth file is unreadable or corrupt.');
+    if ($raw === false || strncmp($raw, SN_FILE_GUARD, strlen(SN_FILE_GUARD)) !== 0) {
+        throw new SnSafeException('Auth file is unreadable or corrupt.');
     }
-    $state = json_decode(substr($raw, strlen(GN_FILE_GUARD)), true);
+    $state = json_decode(substr($raw, strlen(SN_FILE_GUARD)), true);
     if (!is_array($state) || empty($state['password_hash']) || empty($state['secret'])) {
-        throw new GnSafeException('Auth file is unreadable or corrupt.');
+        throw new SnSafeException('Auth file is unreadable or corrupt.');
     }
     return $state;
 }
 
-function gn_auth_write(array $state): void
+function sn_auth_write(array $state): void
 {
-    $path = gn_auth_path();
-    gn_ensure_dir(dirname($path));
+    $path = sn_auth_path();
+    sn_ensure_dir(dirname($path));
     $tmp = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
-    $data = GN_FILE_GUARD . json_encode($state, JSON_UNESCAPED_SLASHES);
+    $data = SN_FILE_GUARD . json_encode($state, JSON_UNESCAPED_SLASHES);
     if (@file_put_contents($tmp, $data, LOCK_EX) === false) {
-        throw new GnSafeException('Could not write auth file. Check folder permissions.');
+        throw new SnSafeException('Could not write auth file. Check folder permissions.');
     }
     @chmod($tmp, 0600);
     if (!@rename($tmp, $path)) {
         @unlink($tmp);
-        throw new GnSafeException('Could not write auth file. Check folder permissions.');
+        throw new SnSafeException('Could not write auth file. Check folder permissions.');
     }
 }
 
 /** Run $fn while holding an exclusive lock, so concurrent requests can't clobber state. */
-function gn_auth_locked(callable $fn)
+function sn_auth_locked(callable $fn)
 {
-    $path = gn_auth_path();
-    gn_ensure_dir(dirname($path));
+    $path = sn_auth_path();
+    sn_ensure_dir(dirname($path));
     $lock = @fopen($path . '.lock', 'c');
     if ($lock === false) {
-        throw new GnSafeException('Could not open auth lock. Check folder permissions.');
+        throw new SnSafeException('Could not open auth lock. Check folder permissions.');
     }
     try {
         flock($lock, LOCK_EX);
@@ -86,7 +86,7 @@ function gn_auth_locked(callable $fn)
     }
 }
 
-function gn_is_https(): bool
+function sn_is_https(): bool
 {
     if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
         return true;
@@ -100,45 +100,45 @@ function gn_is_https(): bool
 }
 
 /** Scope the cookie to the app's folder (the parent of /api/). */
-function gn_cookie_path(): string
+function sn_cookie_path(): string
 {
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/api/x.php'));
     $appDir = rtrim(dirname(dirname($script)), '/');
     return $appDir . '/';
 }
 
-function gn_sign(array $state, int $generation, int $issued): string
+function sn_sign(array $state, int $generation, int $issued): string
 {
-    return hash_hmac('sha256', "gn-auth|$generation|$issued", $state['secret']);
+    return hash_hmac('sha256', "sn-auth|$generation|$issued", $state['secret']);
 }
 
-function gn_set_cookie(string $value, int $expires): void
+function sn_set_cookie(string $value, int $expires): void
 {
-    setcookie(GN_COOKIE, $value, [
+    setcookie(SN_COOKIE, $value, [
         'expires' => $expires,
-        'path' => gn_cookie_path(),
-        'secure' => gn_is_https(),
+        'path' => sn_cookie_path(),
+        'secure' => sn_is_https(),
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
 }
 
-function gn_issue_cookie(array $state): void
+function sn_issue_cookie(array $state): void
 {
     $generation = (int) $state['generation'];
     $issued = time();
-    gn_set_cookie("$generation.$issued." . gn_sign($state, $generation, $issued), $issued + GN_COOKIE_TTL);
+    sn_set_cookie("$generation.$issued." . sn_sign($state, $generation, $issued), $issued + SN_COOKIE_TTL);
 }
 
-function gn_clear_cookie(): void
+function sn_clear_cookie(): void
 {
-    gn_set_cookie('', time() - 3600);
+    sn_set_cookie('', time() - 3600);
 }
 
 /** Returns the cookie's issue time if valid, otherwise null. */
-function gn_verify_cookie(array $state): ?int
+function sn_verify_cookie(array $state): ?int
 {
-    $token = isset($_COOKIE[GN_COOKIE]) ? (string) $_COOKIE[GN_COOKIE] : '';
+    $token = isset($_COOKIE[SN_COOKIE]) ? (string) $_COOKIE[SN_COOKIE] : '';
     if (!preg_match('/^(\d{1,10})\.(\d{1,12})\.([0-9a-f]{64})$/', $token, $m)) {
         return null;
     }
@@ -147,10 +147,10 @@ function gn_verify_cookie(array $state): ?int
     if ($generation !== (int) $state['generation'] || $issued > time() + 300) {
         return null;
     }
-    return hash_equals(gn_sign($state, $generation, $issued), $m[3]) ? $issued : null;
+    return hash_equals(sn_sign($state, $generation, $issued), $m[3]) ? $issued : null;
 }
 
-function gn_json(int $code, array $body): void
+function sn_json(int $code, array $body): void
 {
     http_response_code($code);
     header('Content-Type: application/json');
@@ -163,32 +163,32 @@ function gn_json(int $code, array $body): void
  * Gate for API endpoints. Ends the request with 401 unless the browser holds a
  * valid cookie; slides the cookie's expiry forward when it is over a day old.
  */
-function gn_require_auth(): void
+function sn_require_auth(): void
 {
     try {
-        $state = gn_auth_read();
+        $state = sn_auth_read();
     } catch (Throwable $e) {
-        gn_json(500, ['status' => 'error', 'message' => gn_public_error($e)]);
+        sn_json(500, ['status' => 'error', 'message' => sn_public_error($e)]);
     }
     if ($state === null) {
-        gn_json(401, ['status' => 'error', 'auth' => 'setup', 'message' => 'No password has been set yet.']);
+        sn_json(401, ['status' => 'error', 'auth' => 'setup', 'message' => 'No password has been set yet.']);
     }
-    $issued = gn_verify_cookie($state);
+    $issued = sn_verify_cookie($state);
     if ($issued === null) {
-        gn_json(401, ['status' => 'error', 'auth' => 'login', 'message' => 'Sign-in required.']);
+        sn_json(401, ['status' => 'error', 'auth' => 'login', 'message' => 'Sign-in required.']);
     }
-    if (time() - $issued > GN_RENEW_AFTER) {
-        gn_issue_cookie($state);
+    if (time() - $issued > SN_RENEW_AFTER) {
+        sn_issue_cookie($state);
     }
     header('Cache-Control: no-store');
 }
 
-function gn_valid_new_password($password): ?string
+function sn_valid_new_password($password): ?string
 {
-    if (!is_string($password) || strlen($password) < GN_MIN_PASSWORD) {
-        return 'Password must be at least ' . GN_MIN_PASSWORD . ' characters.';
+    if (!is_string($password) || strlen($password) < SN_MIN_PASSWORD) {
+        return 'Password must be at least ' . SN_MIN_PASSWORD . ' characters.';
     }
-    if (strlen($password) > GN_MAX_PASSWORD) {
+    if (strlen($password) > SN_MAX_PASSWORD) {
         return 'Password is too long.';
     }
     return null;
@@ -196,16 +196,16 @@ function gn_valid_new_password($password): ?string
 
 /**
  * Check a password against the stored hash with a global failed-attempt lockout.
- * Must be called inside gn_auth_locked(). Returns [ok, updatedState, retryAfter].
+ * Must be called inside sn_auth_locked(). Returns [ok, updatedState, retryAfter].
  */
-function gn_check_password(array $state, $password): array
+function sn_check_password(array $state, $password): array
 {
     $now = time();
     $lockedUntil = (int) ($state['locked_until'] ?? 0);
     if ($lockedUntil > $now) {
         return [false, $state, $lockedUntil - $now];
     }
-    if (is_string($password) && strlen($password) <= GN_MAX_PASSWORD
+    if (is_string($password) && strlen($password) <= SN_MAX_PASSWORD
         && password_verify($password, $state['password_hash'])) {
         $state['failures'] = 0;
         $state['locked_until'] = 0;
@@ -216,8 +216,8 @@ function gn_check_password(array $state, $password): array
     }
     $failures = (int) ($state['failures'] ?? 0) + 1;
     $state['failures'] = $failures;
-    if ($failures >= GN_FREE_ATTEMPTS) {
-        $delay = (int) min(GN_MAX_LOCKOUT, 30 * (2 ** min(10, $failures - GN_FREE_ATTEMPTS)));
+    if ($failures >= SN_FREE_ATTEMPTS) {
+        $delay = (int) min(SN_MAX_LOCKOUT, 30 * (2 ** min(10, $failures - SN_FREE_ATTEMPTS)));
         $state['locked_until'] = $now + $delay;
     }
     return [false, $state, 0];

@@ -57,7 +57,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 function sanitizeHTML(html) { return DOMPurify.sanitize(typeof html === 'string' ? html : '', PURIFY_CONFIG); }
 function escapeHTML(text) { return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
-const db = new Dexie("NotesApp");
+const db = new Dexie("SpareNotes");
 db.version(1).stores({ notes: 'id, title, content, updated_at, deleted', sync_queue: 'id, action' });
 
 const editor = new MediumEditor('#editor', {
@@ -415,9 +415,9 @@ document.getElementById('btn-save-prefs').addEventListener('click', () => {
 });
 
 function showEditor(id) { currentNoteId = id; localStorage.setItem('lastActiveNote', id); libraryView.classList.add('hidden'); editorView.classList.remove('hidden'); setTimeout(() => document.getElementById('editor').focus(), 50); }
-function showLibrary() { document.title = 'Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
+function showLibrary() { document.title = 'Spare Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
 async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); editor.setContent(''); showEditor(newId); }
-async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Notes'; showEditor(id); } else showLibrary(); }
+async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = (note.title || 'Untitled Note') + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
 
 async function saveLocal() {
     if (!currentNoteId) return; syncStatus.style.backgroundColor = 'goldenrod';
@@ -426,7 +426,7 @@ async function saveLocal() {
     cloneDiv.querySelectorAll('img').forEach(img => img.classList.remove('active-img'));
     const content = cloneDiv.innerHTML;
     const title = (cloneDiv.textContent || cloneDiv.innerText || "").split('\n')[0].substring(0, 40) || "Untitled Note";
-    document.title = title + ' - Notes';
+    document.title = title + ' - Spare Notes';
     await db.notes.put({ id: currentNoteId, title: title, content: content, updated_at: Date.now(), deleted: 0 }); await db.sync_queue.put({ id: currentNoteId, action: 'upsert' });
     setTimeout(() => { syncStatus.style.backgroundColor = 'green'; }, 300);
 }
@@ -524,7 +524,7 @@ function handleExport(format) {
 editor.subscribe('editableInput', () => { clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
 
 async function processSyncQueue() {
-    if (!GNAuth.isAuthenticated()) return;
+    if (!SNAuth.isAuthenticated()) return;
     if (!navigator.onLine) { syncStatus.style.backgroundColor = 'red'; return; } syncStatus.style.backgroundColor = 'goldenrod';
     try {
         const queue = await db.sync_queue.toArray(); const changesToSync = [];
@@ -547,7 +547,7 @@ async function processSyncQueue() {
 setInterval(processSyncQueue, 5000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 async function init() { const linked = new URLSearchParams(window.location.search).get('n'); const target = linked || localStorage.getItem('lastActiveNote'); if (target) await loadNote(target); else showLibrary(); processSyncQueue(); }
-GNAuth.ready.then(init);
+SNAuth.ready.then(init);
 // Intercept Ctrl+S / Cmd+S to save the note locally instead of opening the browser dialog
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -589,7 +589,7 @@ if (btnRunBackup) {
 }
 // Auto-Backup Timer
 async function checkAutoBackup() {
-    if (!GNAuth.isAuthenticated()) return;
+    if (!SNAuth.isAuthenticated()) return;
     const lastBackup = parseInt(localStorage.getItem('lastAutoBackup') || '0', 10);
     const now = Date.now();
     if (now - lastBackup > 24 * 60 * 60 * 1000) { // 24 hours

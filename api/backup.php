@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/db.php';
 error_reporting(0); // Prevent PHP warnings from corrupting the JSON response
 ini_set('display_errors', 0);
 header('Content-Type: application/json');
@@ -14,7 +15,7 @@ try {
     if (!is_dir($path)) { @mkdir($path, 0755, true); }
     if (!is_dir($path) || !is_writable($path)) { echo json_encode(['status' => 'error', 'message' => 'Path is not writable. Check folder permissions (e.g., chmod 775 or 777).']); exit; }
 
-    $source = __DIR__ . '/database.sqlite';
+    $source = notes_db_path();
     if (!file_exists($source)) { echo json_encode(['status' => 'error', 'message' => 'No database found.']); exit; }
 
     $filename = 'notes_backup_' . date('Ymd_His') . '.sqlite';

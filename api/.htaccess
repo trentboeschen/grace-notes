@@ -1,0 +1,11 @@
+# Defense in depth for installs that keep the database inside the web root.
+# Prefer configuring db_path outside the web root (see config.php).
+<FilesMatch "(\.(sqlite|sqlite3|db)|^config\.local\.php\.example)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

@@ -1,9 +1,8 @@
 <?php
+require_once __DIR__ . '/db.php';
 header('Content-Type: application/json');
 try {
-    $db = new PDO('sqlite:' . __DIR__ . '/database.sqlite');
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);$db->exec("CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY, title TEXT, content TEXT, updated_at INTEGER, deleted INTEGER DEFAULT 0)"); 
-    $db->exec("CREATE TABLE IF NOT EXISTS revisions (id TEXT PRIMARY KEY, note_id TEXT, content TEXT, created_at INTEGER)");
+    $db = notes_db();
     $input = file_get_contents('php://input'); $data = json_decode($input, true);
     $server_timestamp = round(microtime(true) * 1000);$client_last_sync = isset($data['last_sync']) ? (int)$data['last_sync'] : 0;
     $db->beginTransaction();

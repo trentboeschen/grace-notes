@@ -9,7 +9,8 @@ SQLite file on your server, so every device you sign in on sees the same notes.
 
 ## Features
 
-- Rich-text editor with headings, bold/italic/underline, quotes and links
+- Rich-text editor ([Squire](https://github.com/fastmail/Squire)) with headings, bold/italic/underline,
+  quotes, code and links; select text and a small formatting toolbar appears above it
 - Images (resized and embedded in the note) and tables
 - Tags, and instant search from the library by typing
 - Revision history: the last 10 versions of each note are kept on the server
@@ -75,12 +76,17 @@ returns nothing.
 
 ## Using the app
 
-Everything is in the menu: **right-click** anywhere, press **Ctrl/Cmd + K**, or tap
+**Formatting:** select text and a toolbar appears above it with bold, italic, underline,
+link, heading (H2/H3), quote and code. It disappears when nothing is selected.
+
+Everything else is in the menu: **right-click** anywhere, press **Ctrl/Cmd + K**, or tap
 **⋯** on mobile.
 
 | Where      | Key                    | Action                                     |
 |------------|------------------------|--------------------------------------------|
 | Anywhere   | Ctrl/Cmd + K           | Open the menu                              |
+| Editor     | Ctrl/Cmd + B / I / U   | Bold / italic / underline                  |
+| Editor     | Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z | Undo / redo                    |
 | Editor     | Ctrl/Cmd + S           | Save now (notes also save as you type)     |
 | Editor     | Tab in a table's last cell | Add a new row                          |
 | Library    | Type                   | Filter notes by title, content or tag      |

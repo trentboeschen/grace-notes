@@ -13,8 +13,6 @@
     <link rel="apple-touch-icon" href="icon.svg">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="vendor/medium-editor.min.css">
-    <link rel="stylesheet" href="vendor/medium-editor-theme.min.css">
     <style>
         #revisions-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -184,12 +182,13 @@
 
     <script src="vendor/dexie-4.0.8.js"></script>
     <script src="vendor/dompurify-3.4.17.min.js"></script>
-    <script src="vendor/medium-editor.min.js"></script>
+    <script src="vendor/squire-2.4.10.js"></script>
     <script src="vendor/turndown-7.1.2.js"></script>
     <script src="vendor/html-docx-0.3.1.js"></script>
     <script src="vendor/html2pdf-0.10.1.js"></script>
     <script src="auth.js" defer></script>
     <script src="app.js" defer></script>
+    <script src="bubble-toolbar.js" defer></script>
     <div id="toast-notification">Copied to clipboard!</div>
     <div id="mobile-menu-btn">⋯</div>
         <!-- Tags Modal -->

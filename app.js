@@ -2,7 +2,7 @@
 window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        e.stopPropagation();           // Block MediumEditor
+        e.stopPropagation();           // Block the editor's own key handling
         e.stopImmediatePropagation();  // Block anything else on this frame
         
         let x = window.innerWidth / 2, y = window.innerHeight / 2;
@@ -100,17 +100,45 @@ function escapeHTML(text) { return String(text).replace(/[&<>"']/g, (c) => ({ '&
 const db = new Dexie("SpareNotes");
 db.version(1).stores({ notes: 'id, title, content, updated_at, deleted', sync_queue: 'id, action' });
 
-const editor = new MediumEditor('#editor', {
-    placeholder: { text: 'Ctrl+k for tools.', hideOnClick: false },
-    toolbar: { buttons: ['bold', 'italic', 'underline', 'anchor', 'h2', 'h3', 'quote', 'pre'] },
-    anchor: { linkValidation: true, placeholderText: 'Paste or type a link', targetCheckbox: true, targetCheckboxText: 'Open in new window' },
-    paste: {
-        forcePlainText: false,
-        cleanPastedHTML: true,
-        cleanAttrs: ['class', 'style', 'dir'],
-        cleanTags: ['meta', 'span'] 
-    }
+// --- Editor (Squire) ---
+// Squire is a thin layer over contenteditable that stores plain HTML, so the table and
+// image code below can keep working directly on the DOM. The formatting toolbar that
+// appears over selected text lives in bubble-toolbar.js.
+const editorElement = document.getElementById('editor');
+const editor = new Squire(editorElement, {
+    blockTag: 'P',
+    // All HTML entering the editor (setHTML, paste, insertHTML) goes through our DOMPurify config.
+    sanitizeToDOMFragment: (html) => {
+        const frag = DOMPurify.sanitize(html, Object.assign({}, PURIFY_CONFIG, { RETURN_DOM_FRAGMENT: true }));
+        return frag ? document.importNode(frag, true) : document.createDocumentFragment();
+    },
 });
+
+// Squire 2.4+ adds its own drag-handle image resizer (pixel sizes, and it tags images with
+// tabindex). The app already has an image toolbar (alignment + % width), so turn Squire's off
+// to avoid two competing UIs. There is no public option for this; re-check on Squire upgrades.
+if (editor._imageResizer) editor._imageResizer.destroy();
+
+// Paste cleanup (as before): drop presentational attributes and unwrap <span>s from other apps.
+editor.addEventListener('willPaste', (event) => {
+    const frag = event.detail.fragment;
+    if (!frag) return;
+    frag.querySelectorAll('[class], [style], [dir]').forEach(el => { el.removeAttribute('class'); el.removeAttribute('style'); el.removeAttribute('dir'); });
+    frag.querySelectorAll('span, meta').forEach(el => el.replaceWith(...el.childNodes));
+});
+
+// Placeholder shown on an empty note.
+editorElement.dataset.placeholder = 'Ctrl+k for tools.';
+function updatePlaceholder() {
+    const empty = !editorElement.textContent.trim() && !editorElement.querySelector('img, table, hr');
+    editorElement.classList.toggle('is-empty', empty);
+}
+function setEditorHTML(html) { editor.setHTML(html); updatePlaceholder(); }
+
+// For changes made directly to the DOM (tables, image alignment): checkpoint undo first, then save.
+function editDOM(change) { editor.saveUndoState(); change(); saveLocal(); updatePlaceholder(); }
+// Put the caret back where the user was (e.g. before opening the menu) inside Squire.
+function focusEditorAt(range) { editor.focus(); if (range && editorElement.contains(range.startContainer)) editor.setSelection(range); }
 
 let currentNoteId = null; let saveTimeout = null; let contextTargetNoteId = null; let savedSelection = null;
 let contextTargetCell = null;
@@ -283,12 +311,15 @@ document.addEventListener('click', (e) => {
 });
 
 const btnAlignLeft = document.getElementById('img-align-left');
-if (btnAlignLeft) btnAlignLeft.onclick = () => { if(activeImage) { activeImage.style.display = 'inline'; activeImage.style.float = 'left'; activeImage.style.margin = '0 1rem 1rem 0'; saveLocal(); }};
+if (btnAlignLeft) btnAlignLeft.onclick = () => { if(activeImage) editDOM(() => { activeImage.style.display = 'inline'; activeImage.style.float = 'left'; activeImage.style.margin = '0 1rem 1rem 0'; }); };
 const btnAlignCenter = document.getElementById('img-align-center');
-if (btnAlignCenter) btnAlignCenter.onclick = () => { if(activeImage) { activeImage.style.display = 'block'; activeImage.style.float = 'none'; activeImage.style.margin = '1rem auto'; saveLocal(); }};
+if (btnAlignCenter) btnAlignCenter.onclick = () => { if(activeImage) editDOM(() => { activeImage.style.display = 'block'; activeImage.style.float = 'none'; activeImage.style.margin = '1rem auto'; }); };
 const btnAlignRight = document.getElementById('img-align-right');
-if (btnAlignRight) btnAlignRight.onclick = () => { if(activeImage) { activeImage.style.display = 'inline'; activeImage.style.float = 'right'; activeImage.style.margin = '0 0 1rem 1rem'; saveLocal(); }};
-if (resizeSlider) resizeSlider.oninput = (e) => { if(activeImage) { activeImage.style.width = `${e.target.value}%`; saveLocal(); }};
+if (btnAlignRight) btnAlignRight.onclick = () => { if(activeImage) editDOM(() => { activeImage.style.display = 'inline'; activeImage.style.float = 'right'; activeImage.style.margin = '0 0 1rem 1rem'; }); };
+if (resizeSlider) {
+    resizeSlider.addEventListener('pointerdown', () => editor.saveUndoState()); // one undo step per drag
+    resizeSlider.oninput = (e) => { if(activeImage) { activeImage.style.width = `${e.target.value}%`; saveLocal(); }};
+}
 
 function processImageFile(file, overrideRange = null) {
     const reader = new FileReader();
@@ -302,11 +333,8 @@ function processImageFile(file, overrideRange = null) {
             const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
             const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
             
-            editorDOM.focus();
-            if (overrideRange) restoreCursorPosition(overrideRange);
-            else if (savedSelection) restoreCursorPosition(savedSelection);
-            
-            document.execCommand('insertHTML', false, `<img src="${dataUrl}" alt="embedded image" style="width: 100%;">`);
+            focusEditorAt(overrideRange || savedSelection);
+            editor.insertImage(dataUrl, { alt: 'embedded image', style: 'width: 100%;' });
             if(fileImageUpload) fileImageUpload.value = ""; 
             saveLocal();
         };
@@ -333,9 +361,8 @@ if(ctxInsertTable) {
     ctxInsertTable.addEventListener('click', () => {
         contextMenu.classList.add('hidden');
         const tableHTML = `<table><tbody><tr><th>Heading 1</th><th>Heading 2</th></tr><tr><td>Content cell</td><td>Content cell</td></tr><tr><td>Content cell</td><td>Content cell</td></tr></tbody></table><p><br></p>`;
-        editorDOM.focus();
-        if (savedSelection) restoreCursorPosition(savedSelection);
-        document.execCommand('insertHTML', false, tableHTML);
+        focusEditorAt(savedSelection);
+        editor.insertHTML(tableHTML);
         saveLocal();
     });
 }
@@ -347,50 +374,48 @@ if (btnAddRowAbove) {
         const tr = contextTargetCell.parentNode;
         const newTr = document.createElement('tr');
         Array.from(tr.children).forEach(() => { const newTd = document.createElement('td'); newTd.innerHTML = '<br>'; newTr.appendChild(newTd); });
-        tr.parentNode.insertBefore(newTr, tr); saveLocal(); contextMenu.classList.add('hidden');
+        editDOM(() => tr.parentNode.insertBefore(newTr, tr)); contextMenu.classList.add('hidden');
     };
     btnAddRowBelow.onclick = () => {
         if(!contextTargetCell) return;
         const tr = contextTargetCell.parentNode;
         const newTr = document.createElement('tr');
         Array.from(tr.children).forEach(() => { const newTd = document.createElement('td'); newTd.innerHTML = '<br>'; newTr.appendChild(newTd); });
-        tr.parentNode.insertBefore(newTr, tr.nextSibling); saveLocal(); contextMenu.classList.add('hidden');
+        editDOM(() => tr.parentNode.insertBefore(newTr, tr.nextSibling)); contextMenu.classList.add('hidden');
     };
     btnAddColLeft.onclick = () => {
         if(!contextTargetCell) return;
         const idx = getCellIndex(contextTargetCell);
-        contextTargetCell.closest('table').querySelectorAll('tr').forEach(row => {
+        editDOM(() => contextTargetCell.closest('table').querySelectorAll('tr').forEach(row => {
             const newCell = document.createElement(row.querySelector('th') ? 'th' : 'td'); newCell.innerHTML = '<br>';
             row.insertBefore(newCell, row.children[idx]);
-        }); saveLocal(); contextMenu.classList.add('hidden');
+        })); contextMenu.classList.add('hidden');
     };
     btnAddColRight.onclick = () => {
         if(!contextTargetCell) return;
         const idx = getCellIndex(contextTargetCell);
-        contextTargetCell.closest('table').querySelectorAll('tr').forEach(row => {
+        editDOM(() => contextTargetCell.closest('table').querySelectorAll('tr').forEach(row => {
             const newCell = document.createElement(row.querySelector('th') ? 'th' : 'td'); newCell.innerHTML = '<br>';
             row.insertBefore(newCell, row.children[idx + 1] || null);
-        }); saveLocal(); contextMenu.classList.add('hidden');
+        })); contextMenu.classList.add('hidden');
     };
     btnDelRow.onclick = () => {
         if(!contextTargetCell) return;
         const table = contextTargetCell.closest('table');
-        contextTargetCell.parentNode.remove();
-        if(!table.querySelector('tr')) table.remove();
-        saveLocal(); contextMenu.classList.add('hidden');
+        editDOM(() => { contextTargetCell.parentNode.remove(); if(!table.querySelector('tr')) table.remove(); });
+        contextMenu.classList.add('hidden');
     };
     btnDelCol.onclick = () => {
         if(!contextTargetCell) return;
         const table = contextTargetCell.closest('table');
         const idx = getCellIndex(contextTargetCell);
-        table.querySelectorAll('tr').forEach(row => { if(row.children[idx]) row.children[idx].remove(); });
-        if(!table.querySelector('td, th')) table.remove();
-        saveLocal(); contextMenu.classList.add('hidden');
+        editDOM(() => { table.querySelectorAll('tr').forEach(row => { if(row.children[idx]) row.children[idx].remove(); }); if(!table.querySelector('td, th')) table.remove(); });
+        contextMenu.classList.add('hidden');
     };
     btnDelTable.onclick = () => {
         if(!contextTargetCell) return;
-        contextTargetCell.closest('table').remove();
-        saveLocal(); contextMenu.classList.add('hidden');
+        editDOM(() => contextTargetCell.closest('table').remove());
+        contextMenu.classList.add('hidden');
     };
 }
 
@@ -410,6 +435,7 @@ editorDOM.addEventListener('keydown', (e) => {
                     Array.from(tr.children).forEach(() => {
                         const newTd = document.createElement('td'); newTd.innerHTML = '<br>'; newTr.appendChild(newTd);
                     });
+                    editor.saveUndoState();
                     tbody.appendChild(newTr);
                     const newRange = document.createRange();
                     newRange.setStart(newTr.firstElementChild, 0); newRange.collapse(true);
@@ -456,13 +482,13 @@ document.getElementById('btn-save-prefs').addEventListener('click', () => {
 
 function showEditor(id) { currentNoteId = id; localStorage.setItem('lastActiveNote', id); libraryView.classList.add('hidden'); editorView.classList.remove('hidden'); setTimeout(() => document.getElementById('editor').focus(), 50); }
 function showLibrary() { document.title = 'Spare Notes'; currentNoteId = null; localStorage.removeItem('lastActiveNote'); editorView.classList.add('hidden'); libraryView.classList.remove('hidden'); window.history.pushState(null, '', window.location.pathname); renderLibrary(); }
-async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); editor.setContent(''); showEditor(newId); }
-async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { editor.setContent(sanitizeHTML(note.content)); document.title = displayTitle(note) + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
+async function createNewNote() { const newId = Math.random().toString(36).substring(2, 10); setEditorHTML(''); showEditor(newId); }
+async function loadNote(id) { if (window.location.search !== '?n=' + id) window.history.pushState(null, '', '?n=' + id); const note = await db.notes.get(id); if (note && !note.deleted) { setEditorHTML(sanitizeHTML(note.content)); document.title = displayTitle(note) + ' - Spare Notes'; showEditor(id); } else showLibrary(); }
 
 async function saveLocal() {
     if (!currentNoteId) return; syncStatus.style.backgroundColor = 'goldenrod';
     const cloneDiv = document.createElement('div');
-    cloneDiv.innerHTML = sanitizeHTML(editor.getContent());
+    cloneDiv.innerHTML = sanitizeHTML(editor.getHTML());
     cloneDiv.querySelectorAll('img').forEach(img => img.classList.remove('active-img'));
     const content = cloneDiv.innerHTML;
     const title = noteTitleFromHTML(content);
@@ -516,7 +542,7 @@ async function renderLibrary(query = '') {
     });
 }
 function handleExport(format) {
-    if (!format) return; const contentHTML = sanitizeHTML(editor.getContent()); const plainText = htmlToPlainText(contentHTML);
+    if (!format) return; const contentHTML = sanitizeHTML(editor.getHTML()); const plainText = htmlToPlainText(contentHTML);
     let title = (noteTitleFromHTML(contentHTML) || "Note").replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const triggerDownload = (blob, ext) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${title}.${ext}`; a.click(); URL.revokeObjectURL(url); };
     if (format === 'txt') { triggerDownload(new Blob([plainText], { type: 'text/plain' }), 'txt'); } else if (format === 'md') { const turndownService = new TurndownService(); triggerDownload(new Blob([turndownService.turndown(contentHTML)], { type: 'text/markdown' }), 'md'); } else if (format === 'docx') { 
@@ -562,7 +588,7 @@ function handleExport(format) {
         }).from(pdfWrapper.firstElementChild).save(); 
     }
 }
-editor.subscribe('editableInput', () => { clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
+editor.addEventListener('input', () => { updatePlaceholder(); clearTimeout(saveTimeout); saveTimeout = setTimeout(saveLocal, 500); });
 
 async function processSyncQueue() {
     if (!SNAuth.isAuthenticated()) return;
@@ -577,7 +603,7 @@ async function processSyncQueue() {
             if (result.server_notes && result.server_notes.length > 0) {
                 for (const remoteNote of result.server_notes) {
                     const localNote = await db.notes.get(remoteNote.id);
-                    if (!localNote || remoteNote.updated_at > localNote.updated_at) { remoteNote.content = sanitizeHTML(remoteNote.content); await db.notes.put(remoteNote); if (currentNoteId === remoteNote.id) { if (remoteNote.deleted == 1) showLibrary(); else editor.setContent(remoteNote.content); } }
+                    if (!localNote || remoteNote.updated_at > localNote.updated_at) { remoteNote.content = sanitizeHTML(remoteNote.content); await db.notes.put(remoteNote); if (currentNoteId === remoteNote.id) { if (remoteNote.deleted == 1) showLibrary(); else setEditorHTML(remoteNote.content); } }
                 }
                 if (libraryView.classList.contains('hidden') === false) renderLibrary();
             }
@@ -699,7 +725,7 @@ document.getElementById('btn-close-revs').addEventListener('click', () => {
 document.getElementById('btn-restore-rev').addEventListener('click', () => {
     const selectedIdx = revSelect.value;
     if (currentRevisions[selectedIdx]) {
-        editor.setContent(sanitizeHTML(currentRevisions[selectedIdx].content));
+        setEditorHTML(sanitizeHTML(currentRevisions[selectedIdx].content));
         saveLocal();
         revModal.classList.add('hidden'); revModal.style.display = 'none';
     }
